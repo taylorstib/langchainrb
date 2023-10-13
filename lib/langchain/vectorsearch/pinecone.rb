@@ -51,31 +51,39 @@ module Langchain::Vectorsearch
     # @return [Hash] The response from the server
     def add_texts(texts:, ids: [], namespace: "", metadata: nil)
       vectors = texts.map.with_index do |text, i|
+        puts "Embedding text #{i + 1} of #{texts.length}"
         {
           id: ids[i] ? ids[i].to_s : SecureRandom.uuid,
-          metadata: metadata || {content: text},
+          metadata: metadata || {content: text, chunk: i + 1},
           values: llm.embed(text: text)
         }
       end
 
       index = client.index(index_name)
 
-      index.upsert(vectors: vectors, namespace: namespace)
+      slice_size = 25
+      puts "Upserting #{vectors.length} vectors in slices of #{slice_size}"
+
+      vectors.each_slice(slice_size).with_index do |slice, i|
+        puts "Upserting slice #{i + 1} of #{vectors.length / slice_size}"
+
+        index.upsert(vectors: slice, namespace: namespace)
+      end
     end
 
-    def add_data(paths:, namespace: "")
+    def add_data(paths:, namespace: "", chunker_options: {}, metadata: nil)
       raise ArgumentError, "Paths must be provided" if Array(paths).empty?
 
       texts = Array(paths)
         .flatten
         .map do |path|
-          data = Langchain::Loader.new(path)&.load&.chunks
+          data = Langchain::Loader.new(path)&.load&.chunks(chunker_options)
           data.map { |chunk| chunk[:text] }
         end
 
       texts.flatten!
 
-      add_texts(texts: texts, namespace: namespace)
+      add_texts(texts: texts, namespace: namespace, metadata: metadata)
     end
 
     # Update a list of texts in the index
