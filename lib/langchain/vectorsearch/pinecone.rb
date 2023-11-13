@@ -51,8 +51,9 @@ module Langchain::Vectorsearch
     # @param metadata [Hash] The metadata to use for the texts
     # @return [Hash] The response from the server
     def add_texts(texts:, ids: [], namespace: "", metadata: nil)
+      Langchain.logger.info "Embedding #{texts.length} texts"
       vectors = texts.map.with_index do |text, i|
-        puts "Embedding text #{i + 1} of #{texts.length}"
+        Langchain.logger.debug "Embedding text #{i + 1} of #{texts.length} texts"
         {
           id: ids[i] ? ids[i].to_s : SecureRandom.uuid,
           metadata: metadata || {content: text, chunk: i + 1},
@@ -63,10 +64,10 @@ module Langchain::Vectorsearch
       index = client.index(index_name)
 
       slice_size = 25
-      puts "Upserting #{vectors.length} vectors in slices of #{slice_size}"
 
+      Langchain.logger.info "Upserting #{vectors.length} vectors in slices of #{slice_size}"
       vectors.each_slice(slice_size).with_index do |slice, i|
-        puts "Upserting slice #{i + 1} of #{vectors.length / slice_size}"
+        Langchain.logger.debug "Upserting slice #{i + 1} of #{(vectors.length / slice_size.to_f).ceil}"
 
         index.upsert(vectors: slice, namespace: namespace)
       end
